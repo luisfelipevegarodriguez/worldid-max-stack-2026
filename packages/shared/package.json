@@ -1,0 +1,7 @@
+{
+  "name": "@worldid/shared",
+  "version": "0.1.0",
+  "main": "./agents-client.ts",
+  "types": "./agents-client.ts",
+  "dependencies": {}
+}

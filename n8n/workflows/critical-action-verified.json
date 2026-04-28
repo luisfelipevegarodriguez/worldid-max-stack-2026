@@ -1,0 +1,62 @@
+{
+  "name": "critical-action-verified",
+  "description": "World ID-gated critical action orchestrator. Validates is_human JWT, routes to Zoom/DocuSign/GitHub/MiniApp actions.",
+  "nodes": [
+    {
+      "name": "Webhook (JWT Protected)",
+      "type": "n8n-nodes-base.webhook",
+      "parameters": {
+        "path": "critical-action",
+        "httpMethod": "POST",
+        "authentication": "headerAuth"
+      }
+    },
+    {
+      "name": "Validate is_human + flags",
+      "type": "n8n-nodes-base.code",
+      "parameters": {
+        "jsCode": "const body = $input.first().json;\nif (!body.is_human) throw new Error('Not human-verified');\nif (body.flags?.blocked) throw new Error('User blocked');\nreturn [body];"
+      }
+    },
+    {
+      "name": "Route by action_type",
+      "type": "n8n-nodes-base.switch",
+      "parameters": {
+        "dataType": "string",
+        "value1": "={{ $json.action_type }}",
+        "rules": [
+          { "value2": "zoom_and_sign", "output": 0 },
+          { "value2": "agent_delegation", "output": 1 },
+          { "value2": "github_dispatch", "output": 2 },
+          { "value2": "miniapp_action", "output": 3 }
+        ]
+      }
+    },
+    {
+      "name": "Create Zoom Meeting (Verified)",
+      "type": "n8n-nodes-base.zoom",
+      "parameters": {
+        "operation": "create",
+        "topic": "={{ 'Verified: ' + $json.metadata.topic }}",
+        "type": 2
+      }
+    },
+    {
+      "name": "Send DocuSign Envelope",
+      "type": "n8n-nodes-base.httpRequest",
+      "parameters": {
+        "method": "POST",
+        "url": "https://demo.docusign.net/restapi/v2.1/accounts/{{ $env.DOCUSIGN_ACCOUNT_ID }}/envelopes",
+        "authentication": "oAuth2"
+      }
+    },
+    {
+      "name": "Log to WorldProof DB",
+      "type": "n8n-nodes-base.postgres",
+      "parameters": {
+        "operation": "insert",
+        "table": "WorldProof"
+      }
+    }
+  ]
+}

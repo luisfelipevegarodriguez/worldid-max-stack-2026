@@ -1,0 +1,65 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String   @id @default(cuid())
+  worldNullifier String   @unique
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  flags          Json     @default("{\"blocked\": false, \"grant_eligible\": true, \"agent_delegated\": false}")
+
+  proofs       WorldProof[]
+  loginLogs    WorldLoginLog[]
+  githubLinks  GitHubLink[]
+  delegations  AgentDelegation[]
+}
+
+model WorldProof {
+  id            String   @id @default(cuid())
+  userId        String
+  proof         Json     // full IDKit proof
+  action        String
+  verifiedAt    DateTime @default(now())
+  level         String   // 'orb' | 'face'
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+model WorldLoginLog {
+  id        String   @id @default(cuid())
+  userId    String
+  ipHash    String?
+  userAgent String?
+  loggedAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+model GitHubLink {
+  id             String   @id @default(cuid())
+  userId         String
+  githubUsername String
+  encryptedToken String   // AES-256 encrypted PAT
+  linkedAt       DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+model AgentDelegation {
+  id          String   @id @default(cuid())
+  userId      String
+  agentId     String   // CrewAI agent / n8n workflow ID
+  agentType   String   // 'crewai' | 'n8n' | 'claude' | 'grok'
+  permissions Json     // { zoom: bool, docusign: bool, github: bool }
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  expiresAt   DateTime?
+
+  user User @relation(fields: [userId], references: [id])
+}
