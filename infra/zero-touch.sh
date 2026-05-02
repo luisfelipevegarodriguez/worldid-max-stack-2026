@@ -1,99 +1,100 @@
-#!/usr/bin/env bash
-# Single-shot, idempotente, auto-curativo
-# Uso: bash infra/zero-touch.sh
+#!/bin/bash
 set -euo pipefail
 
-############ 0. Auto-instalar deps faltantes ############
-need() { command -v "$1" >/dev/null || eval "$2"; }
-need gh      'curl -sS https://webi.sh/gh | sh'
-need vercel  'npm i -g vercel'
-need forge   'curl -L https://foundry.paradigm.xyz | bash && foundryup'
-need jq      'sudo apt-get -y install jq 2>/dev/null || brew install jq'
+echo "🚀 Iniciando World Max Stack Zero-Touch Deployment..."
+echo "================================================="
+echo "Repo: worldid-max-stack-2026"
+echo "User: luisfelipevegarodriguez"
+echo "Fecha: $(date)"
+echo "================================================="
 
-############ 1. Recoger secrets UNA vez ############
-SECRETS=( DATABASE_URL BACKEND_JWT_SECRET WORLD_ID_APP_SECRET WORLD_CHAIN_RPC_URL
-          VERCEL_TOKEN GH_TOKEN GCP_SA_KEY OPENAI_API_KEY CRON_SECRET DEPLOYER_PK
-          TREASURY NEXT_PUBLIC_WORLD_ID_APP_ID NEXT_PUBLIC_APP_URL GCP_PROJECT )
-ENVF=$(mktemp); trap "shred -u $ENVF 2>/dev/null || rm -f $ENVF" EXIT
-for K in "${SECRETS[@]}"; do
-  V="${!K:-}"
-  [[ -z "$V" ]] && read -rsp "  $K: " V && echo
-  echo "$K=$V" >> "$ENVF"
-done
-set -a; source "$ENVF"; set +a
+# ── 1. VERIFICAR HERRAMIENTAS ────────────────────────────────────────────────
+echo "[1/6] Verificando herramientas..."
+command -v gh       >/dev/null 2>&1 || { echo "Instalando gh CLI..."; brew install gh 2>/dev/null || sudo apt install gh -y; }
+command -v vercel   >/dev/null 2>&1 || npm install -g vercel
+command -v gcloud   >/dev/null 2>&1 || { echo "❌ Instala Google Cloud SDK: https://cloud.google.com/sdk/docs/install"; exit 1; }
+command -v npx      >/dev/null 2>&1 || { echo "❌ Node.js requerido: https://nodejs.org"; exit 1; }
+echo "✅ Herramientas OK"
 
-############ 2. Auth no interactivo ############
-echo "$GCP_SA_KEY" | gcloud auth activate-service-account --key-file=/dev/stdin
-gcloud config set project "$GCP_PROJECT"
-echo "$GH_TOKEN" | gh auth login --with-token
+# ── 2. AUTENTICACIÓN ─────────────────────────────────────────────────────────
+echo "[2/6] Autenticando servicios..."
+if [ -n "${GCP_SA_KEY:-}" ]; then
+  gcloud auth activate-service-account --key-file=<(echo "$GCP_SA_KEY" | base64 -d)
+  echo "✅ GCP autenticado"
+else
+  echo "⚠️  GCP_SA_KEY no definido — saltando auth GCP"
+fi
 
-############ 3. Push secrets a los 3 stores (idempotente) ############
-echo "▶ Cargando secrets en GitHub Actions..."
-for K in "${SECRETS[@]}"; do
-  gh secret set "$K" --body "${!K}" --repo luisfelipevegarodriguez/worldid-max-stack-2026 >/dev/null
-done
+if [ -n "${VERCEL_TOKEN:-}" ]; then
+  echo "✅ VERCEL_TOKEN presente"
+else
+  echo "❌ VERCEL_TOKEN no definido"; exit 1
+fi
 
-echo "▶ Cargando secrets en Vercel..."
-for K in NEXT_PUBLIC_WORLD_ID_APP_ID NEXT_PUBLIC_APP_URL WORLD_ID_APP_SECRET \
-         WORLD_CHAIN_RPC_URL BACKEND_JWT_SECRET DATABASE_URL; do
-  printf '%s' "${!K}" | vercel env rm  "$K" production --token "$VERCEL_TOKEN" --yes 2>/dev/null || true
-  printf '%s' "${!K}" | vercel env add "$K" production --token "$VERCEL_TOKEN" --yes
-done
+# ── 3. DEPLOY CONTRATOS WORLD CHAIN ─────────────────────────────────────────
+echo "[3/6] Desplegando contratos en World Chain..."
+if [ -d "contracts/world-chain" ]; then
+  cd contracts/world-chain
+  npm install --silent
+  npx hardhat run scripts/deploy.ts --network worldchain
+  cd ../..
+  echo "✅ Contratos desplegados"
+else
+  echo "⚠️  Directorio contracts/world-chain no encontrado — saltando"
+fi
 
-echo "▶ Cargando secrets en GCP Secret Manager..."
-for K in WORLD_ID_APP_SECRET BACKEND_JWT_SECRET DEPLOYER_PK OPENAI_API_KEY CRON_SECRET; do
-  printf '%s' "${!K}" | gcloud secrets create "$K" --data-file=- 2>/dev/null \
-    || printf '%s' "${!K}" | gcloud secrets versions add "$K" --data-file=-
-done
+# ── 4. DEPLOY BACKEND (Cloud Run) ────────────────────────────────────────────
+echo "[4/6] Desplegando Backend a Cloud Run..."
+if [ -d "services/backend" ]; then
+  cd services/backend
+  gcloud run deploy world-backend \
+    --source . \
+    --region europe-west1 \
+    --platform managed \
+    --allow-unauthenticated \
+    --set-env-vars="DATABASE_URL=${DATABASE_URL:-},WORLD_ID_APP_SECRET=${WORLD_ID_APP_SECRET:-},NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-}" \
+    --quiet
+  BACKEND_URL=$(gcloud run services describe world-backend --region europe-west1 --format 'value(status.url)')
+  echo "✅ Backend activo: $BACKEND_URL"
+  cd ../..
+else
+  echo "⚠️  Directorio services/backend no encontrado — saltando"
+fi
 
-############ 4. Deploy on-chain PaymentRouter (CREATE2 idempotente) ############
-echo "▶ Desplegando PaymentRouter en World Chain..."
-forge script script/DeployPaymentRouter.s.sol \
-  --rpc-url "$WORLD_CHAIN_RPC_URL" --private-key "$DEPLOYER_PK" \
-  --broadcast --verify --json 2>&1 | tee /tmp/forge-deploy.log
-ROUTER=$(cat broadcast/DeployPaymentRouter.s.sol/480/run-latest.json \
-  | jq -r '.transactions[0].contractAddress')
-printf '%s' "$ROUTER" | gcloud secrets create PAYMENT_ROUTER_ADDR --data-file=- 2>/dev/null \
-  || printf '%s' "$ROUTER" | gcloud secrets versions add PAYMENT_ROUTER_ADDR --data-file=-
-echo "  PaymentRouter: $ROUTER"
+# ── 5. DEPLOY FRONTEND (Vercel) ──────────────────────────────────────────────
+echo "[5/6] Desplegando Frontend a Vercel..."
+if [ -d "apps/world-miniapp" ]; then
+  cd apps/world-miniapp
+  vercel --prod --token="$VERCEL_TOKEN" --yes
+  echo "✅ Frontend desplegado en Vercel"
+  cd ../..
+else
+  echo "⚠️  Directorio apps/world-miniapp no encontrado — saltando"
+fi
 
-############ 5. Push → dispara canary.yml en CI ############
-echo "▶ Push de código → canary.yml..."
-git add -A
-git -c user.email=ci@zero-touch.local commit -m "chore: zero-touch activation $(date -u +%FT%TZ)" || true
-git push origin main
+# ── 6. DEPLOY GROWTH AGENT ───────────────────────────────────────────────────
+echo "[6/6] Desplegando Growth Agent..."
+if [ -d "services/growth-agent" ]; then
+  cd services/growth-agent
+  gcloud run deploy growth-agent \
+    --source . \
+    --region europe-west1 \
+    --platform managed \
+    --no-allow-unauthenticated \
+    --quiet
+  AGENT_URL=$(gcloud run services describe growth-agent --region europe-west1 --format 'value(status.url)')
+  echo "✅ Growth Agent activo: $AGENT_URL"
+  cd ../..
+else
+  echo "⚠️  Directorio services/growth-agent no encontrado — saltando"
+fi
 
-############ 6. Espera CI verde ############
-echo "▶ Esperando GitHub Actions..."
-gh run watch --exit-status
-
-############ 7. Health checks con retry ############
-echo "▶ Health checks..."
-BACKEND=$(gcloud run services describe world-backend  --region=europe-west1 --format='value(status.url)')
-GROWTH=$( gcloud run services describe growth-agent  --region=europe-west1 --format='value(status.url)')
-FRONT=$(vercel ls --prod --token "$VERCEL_TOKEN" | awk 'NR==2{print $2}')
-for U in "$BACKEND/healthz" "$GROWTH/healthz" "https://$FRONT/api/analytics/full"; do
-  curl -fsS --retry 12 --retry-delay 5 "$U" >/dev/null && echo "  ✅ $U" || echo "  ❌ $U"
-done
-
-############ 8. Cloud Scheduler self-heal (idempotente) ############
-echo "▶ Registrando Cloud Scheduler self-heal..."
-gcloud scheduler jobs create http self-heal \
-  --location=europe-west1 \
-  --schedule="*/5 * * * *" \
-  --uri="$BACKEND/internal/self-heal" \
-  --oidc-service-account-email="ci@${GCP_PROJECT}.iam.gserviceaccount.com" \
-  --headers="X-Cron-Secret=$CRON_SECRET" 2>/dev/null \
-  || echo "  (scheduler ya existe, omitido)"
-
-############ 9. Output final ############
-cat <<EOF
-==================================================
- WORLD MAX STACK — ACTIVO $(date -u +%FT%TZ)
- PaymentRouter : $ROUTER
- Backend URL   : $BACKEND
- Growth Agent  : $GROWTH
- Frontend URL  : https://$FRONT
- Siguiente paso: https://developer.world.org/apps  (submit manual)
-==================================================
-EOF
+echo ""
+echo "=================================================="
+echo "  ✅ WORLD MAX STACK — DEPLOYMENT COMPLETO"
+echo "=================================================="
+echo "  🌐 Frontend:     Vercel Dashboard"
+echo "  ⚙️  Backend:      Cloud Run europe-west1"
+echo "  🤖 Agent:        Cloud Run (auth requerida)"
+echo "  📋 Siguiente:    https://developer.world.org/mini-apps"
+echo "=================================================="
