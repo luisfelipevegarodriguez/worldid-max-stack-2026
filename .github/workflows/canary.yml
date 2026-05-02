@@ -1,0 +1,144 @@
+name: Canary Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: canary-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GCP_PROJECT: ${{ secrets.GCP_PROJECT }}
+  REGION: europe-west1
+  BACKEND_IMAGE: gcr.io/${{ secrets.GCP_PROJECT }}/world-backend
+  AGENT_IMAGE: gcr.io/${{ secrets.GCP_PROJECT }}/growth-agent
+
+jobs:
+  # ── 1. Tests ──────────────────────────────────────────────
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20', cache: 'npm' }
+      - run: npm ci
+      - run: npm run build --if-present
+      - run: npm test --if-present
+
+  # ── 2. Build & push Docker images ─────────────────────────
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - run: gcloud auth configure-docker --quiet
+      - name: Build & push backend
+        run: |
+          docker build -t $BACKEND_IMAGE:${{ github.sha }} \
+            -t $BACKEND_IMAGE:latest \
+            -f services/backend/Dockerfile services/backend
+          docker push $BACKEND_IMAGE:${{ github.sha }}
+          docker push $BACKEND_IMAGE:latest
+      - name: Build & push growth-agent
+        run: |
+          docker build -t $AGENT_IMAGE:${{ github.sha }} \
+            -t $AGENT_IMAGE:latest \
+            -f services/growth-agent/Dockerfile services/growth-agent
+          docker push $AGENT_IMAGE:${{ github.sha }}
+          docker push $AGENT_IMAGE:latest
+
+  # ── 3. Canary deploy (10% → SLO check → 100%) ────────────
+  canary:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Deploy backend canary (10%)
+        run: |
+          gcloud run deploy world-backend \
+            --image=$BACKEND_IMAGE:${{ github.sha }} \
+            --region=$REGION --platform=managed \
+            --no-traffic \
+            --set-secrets=WORLD_ID_APP_SECRET=WORLD_ID_APP_SECRET:latest,BACKEND_JWT_SECRET=BACKEND_JWT_SECRET:latest,DEPLOYER_PK=DEPLOYER_PK:latest,OPENAI_API_KEY=OPENAI_API_KEY:latest,CRON_SECRET=CRON_SECRET:latest \
+            --set-env-vars=DATABASE_URL=${{ secrets.DATABASE_URL }},PAYMENT_ROUTER_ADDR=${{ secrets.PAYMENT_ROUTER_ADDR }},WORLD_CHAIN_RPC_URL=${{ secrets.WORLD_CHAIN_RPC_URL }} \
+            --quiet
+          gcloud run services update-traffic world-backend \
+            --region=$REGION \
+            --to-revisions=LATEST=10 \
+            --quiet
+
+      - name: Deploy growth-agent canary (10%)
+        run: |
+          gcloud run deploy growth-agent \
+            --image=$AGENT_IMAGE:${{ github.sha }} \
+            --region=$REGION --platform=managed \
+            --no-traffic \
+            --set-secrets=OPENAI_API_KEY=OPENAI_API_KEY:latest,CRON_SECRET=CRON_SECRET:latest \
+            --set-env-vars=BACKEND_URL=$(gcloud run services describe world-backend --region=$REGION --format='value(status.url)'),DATABASE_URL=${{ secrets.DATABASE_URL }} \
+            --quiet
+          gcloud run services update-traffic growth-agent \
+            --region=$REGION \
+            --to-revisions=LATEST=10 \
+            --quiet
+
+      - name: SLO gate (5 min bake)
+        uses: actions/setup-node@v4
+        with: { node-version: '20' }
+      - run: node .github/scripts/slo-gate.js
+        env:
+          BACKEND_URL: ${{ steps.auth.outputs.project_id }}
+          GCP_PROJECT: ${{ secrets.GCP_PROJECT }}
+          REGION: europe-west1
+
+      - name: Promote to 100%
+        run: |
+          gcloud run services update-traffic world-backend \
+            --region=$REGION --to-latest --quiet
+          gcloud run services update-traffic growth-agent \
+            --region=$REGION --to-latest --quiet
+          echo "✅ Canary promoted to 100%"
+
+      - name: Deploy Vercel frontend
+        run: |
+          npx vercel --prod --token=${{ secrets.VERCEL_TOKEN }} --yes
+        working-directory: apps/frontend
+
+  # ── 4. Auto-rollback si falla ─────────────────────────────
+  rollback:
+    needs: canary
+    if: failure()
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+    steps:
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - name: Rollback to previous revision
+        run: |
+          gcloud run services update-traffic world-backend \
+            --region=$REGION --to-revisions=LATEST=0 --quiet || true
+          gcloud run services update-traffic growth-agent \
+            --region=$REGION --to-revisions=LATEST=0 --quiet || true
+          echo "🔄 Rollback ejecutado"
