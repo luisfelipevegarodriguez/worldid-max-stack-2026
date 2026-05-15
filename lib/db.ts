@@ -6,17 +6,21 @@ const supabase = createClient(
 );
 
 /**
- * Guarda un nullifier para prevenir doble-uso (antifraude).
- * Retorna true si es nuevo, false si ya existía (fraude detectado).
+ * Guarda nullifier. Retorna true si es nuevo, false si ya existía (fraude).
  */
 export async function saveNullifier(
   nullifier: string,
   action: string,
-  metadata?: Record<string, unknown>
+  metadata: Record<string, unknown> = {}
 ): Promise<boolean> {
   const { data, error } = await supabase
     .from('nullifiers')
-    .insert({ nullifier_hash: nullifier, action, metadata, created_at: new Date().toISOString() })
+    .insert({
+      nullifier_hash: nullifier,
+      action,
+      metadata,
+      created_at: new Date().toISOString(),
+    })
     .select()
     .single();
 
