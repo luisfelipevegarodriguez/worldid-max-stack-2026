@@ -1,57 +1,44 @@
-name: Zero-Touch Deploy
+name: 🚀 Deploy World ID Max Stack
 
 on:
   push:
     branches: [main]
-  workflow_dispatch:
-
-permissions:
-  contents: read
-  id-token: write  # required for OIDC
+  pull_request:
+    branches: [main]
 
 jobs:
-  deploy:
+  build-and-deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node.js 20
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
 
-      - name: Auth GCP via OIDC (Workload Identity Federation)
-        uses: google-github-actions/auth@v2
-        with:
-          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+      - name: Install dependencies
+        run: npm ci
 
-      - name: Setup Google Cloud SDK
-        uses: google-github-actions/setup-gcloud@v2
-        with:
-          project_id: ${{ secrets.GCP_PROJECT_ID }}
+      - name: Type check
+        run: npm run type-check
 
-      - name: Install Vercel CLI
-        run: npm install -g vercel
+      - name: Lint
+        run: npm run lint
 
-      - name: Run Zero-Touch Deploy
+      - name: Build
+        run: npm run build
         env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          WORLD_ID_APP_SECRET: ${{ secrets.WORLD_ID_APP_SECRET }}
-          NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
-          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
-        run: |
-          chmod +x infra/zero-touch.sh
-          bash infra/zero-touch.sh
+          NEXT_PUBLIC_WORLD_APP_ID: ${{ secrets.NEXT_PUBLIC_WORLD_APP_ID }}
+          WORLD_RP_ID: ${{ secrets.WORLD_RP_ID }}
+          NEXT_PUBLIC_WORLD_ENVIRONMENT: production
+          ALLOW_LEGACY_PROOFS: false
 
-      - name: Notify Deploy Status
-        if: always()
-        run: |
-          echo "Deploy status: ${{ job.status }}"
-          echo "Commit: ${{ github.sha }}"
-          echo "Branch: ${{ github.ref_name }}"
+      - name: Deploy to Vercel (Production)
+        if: github.ref == 'refs/heads/main'
+        run: npx vercel --prod --token=${{ secrets.VERCEL_TOKEN }} --yes
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}

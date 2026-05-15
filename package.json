@@ -1,16 +1,32 @@
 {
   "name": "worldid-max-stack-2026",
-  "private": true,
-  "workspaces": ["apps/*", "packages/*"],
+  "version": "2.0.0",
+  "description": "World ID Max Stack — Mini Apps + Nullifier + Grants LATAM",
   "scripts": {
-    "dev": "turbo run dev",
-    "build": "turbo run build",
-    "lint": "turbo run lint",
-    "typecheck": "turbo run typecheck"
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "next": "14.2.29",
+    "react": "^18",
+    "react-dom": "^18",
+    "@worldcoin/idkit": "^1.3.2",
+    "@worldcoin/minikit-js": "^1.7.0",
+    "zod": "^3.22.4",
+    "@supabase/supabase-js": "^2.39.0"
   },
   "devDependencies": {
-    "turbo": "^2.3.0",
-    "typescript": "^5.4.5"
-  },
-  "packageManager": "pnpm@9.4.0"
+    "typescript": "^5",
+    "@types/node": "^20",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "eslint": "^8",
+    "eslint-config-next": "14.2.29",
+    "tailwindcss": "^3.4.1",
+    "autoprefixer": "^10.4.17",
+    "postcss": "^8.4.33"
+  }
 }
