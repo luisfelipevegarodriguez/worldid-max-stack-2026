@@ -23,7 +23,7 @@ The signing key is server-only (`WORLD_SIGNING_KEY`). `POST /api/rp-signature` c
 3. Copy the Postgres URI into `DATABASE_URL` (Project Settings → Database). The pooler URI (port 6543) is the right one for the Vercel runtime. Copy the direct URI (port 5432) only if you later run `prisma migrate`.
 4. Copy the project URL and service role key into `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` if you want the REST fallback. The service role bypasses RLS. Do not put it in `NEXT_PUBLIC_*`.
 
-The Prisma schema maps `Nullifier` onto that table. Other Prisma models (`User`, `WorldProof`, and the rest) are not created by the SQL file. Do not run `prisma migrate` against the free database unless you intend to add those tables. `prisma generate` does not connect and is part of `pnpm build`.
+The Prisma schema maps `Nullifier` onto that table. Other Prisma models (`User`, `WorldProof`, and the rest) are not created by the SQL file. Do not run `prisma migrate` against the free database unless you intend to add those tables. `pnpm build` runs `prisma generate`, which does not connect. Prisma 7 reads the URL from `apps/web/prisma.config.ts` and the runtime client uses the `pg` driver adapter only when `DATABASE_URL` is set.
 
 Either `DATABASE_URL` or the Supabase REST pair is enough for the verify route to store a nullifier. With neither, a successful World ID check returns `persisted: false` instead of failing the build.
 

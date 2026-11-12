@@ -29,3 +29,11 @@ No call site in this repo changed. `new PrismaClient()` and `import { PrismaClie
 - `NotFoundError` is removed. Use `PrismaClientKnownRequestError` with code `P2025`. This code does not catch that error.
 - PostgreSQL full-text search preview flag `fullTextSearch` is renamed `fullTextSearchPostgres`. This schema does not enable it.
 - Model names `async`, `await`, and `using` are reserved. None of ours use them.
+
+## Prisma 6.19.3 → 7.10.1
+
+- The generator provider is `prisma-client` (not `prisma-client-js`) and `output` is required. The client is generated to `apps/web/generated/prisma`, which is gitignored. `import { PrismaClient } from '@prisma/client'` no longer resolves the client.
+- `url` is removed from the `datasource` block. The connection string lives in `apps/web/prisma.config.ts`. `prisma generate` still does not connect. The config falls back to a localhost URL when `DATABASE_URL` is empty so the build does not need a secret.
+- `new PrismaClient()` requires a driver adapter. This app uses `@prisma/adapter-pg` and the `pg` package: `new PrismaClient({ adapter: new PrismaPg({ connectionString }) })`. The client is constructed only when `DATABASE_URL` is set.
+- Minimum TypeScript for the Prisma 7 CLI is 5.4. This repo already uses 5.4+.
+- Prisma 8 is still a release candidate (`8.0.0-rc.33` on the `latest` dist-tag). This repo stays on the stable 7.10.1 client.

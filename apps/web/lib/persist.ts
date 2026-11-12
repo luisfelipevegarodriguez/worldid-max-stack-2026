@@ -1,4 +1,5 @@
-import { Prisma } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
+import { Prisma, PrismaClient } from '../generated/prisma/client';
 import { createClient } from '@supabase/supabase-js';
 import { databaseUrl, supabaseConfig } from './config';
 
@@ -11,15 +12,15 @@ type NullifierInput = {
 };
 
 const globalForPrisma = globalThis as unknown as {
-  prisma?: import('@prisma/client').PrismaClient;
+  prisma?: PrismaClient;
 };
 
 async function getPrisma() {
   const url = databaseUrl();
   if (!url) return null;
   if (!globalForPrisma.prisma) {
-    const { PrismaClient } = await import('@prisma/client');
-    globalForPrisma.prisma = new PrismaClient();
+    const adapter = new PrismaPg({ connectionString: url });
+    globalForPrisma.prisma = new PrismaClient({ adapter });
   }
   return globalForPrisma.prisma;
 }

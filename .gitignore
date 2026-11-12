@@ -9,4 +9,4 @@ dist/
 certs/
 .turbo/
 coverage/
-apps/web/src/generated/
+apps/web/generated/
