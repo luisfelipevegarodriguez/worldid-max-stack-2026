@@ -1,44 +1,13 @@
-# Deploy Guide
+# Deploy
 
-## 1. Vercel (Frontend + API)
-```bash
-cd apps/web
-vercel --prod
-# Set env vars in Vercel dashboard:
-# WORLD_APP_ID, WORLD_RP_ID, WORLD_SIGNING_KEY, JWT_SECRET,
-# UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN,
-# N8N_WEBHOOK_URL, N8N_WEBHOOK_SECRET
-```
+The free path is [BOOTSTRAP.md](BOOTSTRAP.md): Vercel Hobby for `apps/web`, Supabase free for `nullifiers`, and the Dockerfiles under `services/` on Cloud Run or Fly if you want the health endpoints.
 
-## 2. n8n on Cloud Run
-```bash
-gcloud run deploy n8n \
-  --image n8nio/n8n:latest \
-  --region europe-west1 \
-  --set-env-vars N8N_ENCRYPTION_KEY=$(gcloud secrets versions access latest --secret=N8N_ENCRYPTION_KEY) \
-  --set-env-vars WEBHOOK_URL=https://n8n.your-domain.com \
-  --allow-unauthenticated
-```
+GitHub Actions in this repo is not a deploy path while the account billing block is in place. `infra/zero-touch.sh` refuses to run so it cannot print a false "deployment complete" banner.
 
-## 3. Database (Supabase/Neon)
-```bash
-pnpm prisma migrate deploy
-pnpm prisma generate
-```
+Vercel project settings:
 
-## 4. Secrets (Google Secret Manager)
-```bash
-echo -n "your_signing_key" | gcloud secrets create WORLD_SIGNING_KEY --data-file=-
-echo -n "your_jwt_secret" | gcloud secrets create JWT_SECRET --data-file=-
-```
-
-## 5. World Developer Portal
-- Go to https://developer.world.org
-- Upgrade app to World ID 4.0
-- Get rp_id and signing_key
-- Add action: human-verified-agent-2026
-- Set redirect URI: https://your-app.vercel.app/api/auth/worldid/verify
-
-## 6. Retro Mini Apps (Deadline 9 Jun 2026)
-- Submit at: https://developer.world.org/mini-apps/retro
-- Focus: AI agents + enterprise verification + nullifier MAU
+- Root Directory: `apps/web`
+- Framework Preset: Next.js
+- Node.js: 22.x
+- Install Command: `pnpm install --frozen-lockfile`
+- Build Command: `pnpm run build`

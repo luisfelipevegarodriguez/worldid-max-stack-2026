@@ -1,18 +1,15 @@
-import { signRequest } from '@worldcoin/idkit-core/signing'
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server';
 
-// NEVER expose WORLD_SIGNING_KEY to the client — edge function only
-export const runtime = 'edge'
+export const dynamic = 'force-dynamic';
 
-export async function POST(req: NextRequest) {
-  try {
-    const body = await req.json()
-    const signature = await signRequest(
-      process.env.WORLD_SIGNING_KEY!,
-      body
-    )
-    return NextResponse.json({ signature })
-  } catch (e) {
-    return NextResponse.json({ error: 'Signing failed' }, { status: 500 })
-  }
+// IDKit 2.x has no RP signing helper. The IDKit 4 upgrade replaces this route
+// with signRequest() and never returns the signing key.
+export async function POST() {
+  return NextResponse.json(
+    {
+      error: 'signing_unavailable',
+      detail: 'RP request signatures are added with IDKit 4. Proof verification still runs without this route.',
+    },
+    { status: 501 },
+  );
 }

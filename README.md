@@ -1,54 +1,44 @@
-# 🌍 World ID Max Stack 2026
+# World ID Max Stack 2026
 
-> Human-Verified platform — World ID + Mini Apps + Grants LATAM
+Umbrella app for Luis: World ID mini apps (payments, grants, rewards), nullifier storage, and a human-verified agent handoff. The deployable frontend is `apps/web`. `services/backend` and `services/growth-agent` are small Docker images for a free container tier.
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/luisfelipevegarodriguez/worldid-max-stack-2026)
+GitHub Actions on this account does not run (billing). Install, lint, type-check, test, and build locally. Do not treat a green badge as evidence.
 
-## Stack
-
-- **Framework**: Next.js 14 (App Router)
-- **World ID**: IDKit v1.3.2 + MiniKit v1.7.0
-- **DB**: Supabase (nullifier antifraude)
-- **Deploy**: Vercel + GitHub Actions
-- **Chain**: World Chain
-
-## Mini Apps
-
-| App | Descripción | Ruta |
-|-----|-------------|------|
-| 💸 Payments | Remesas LATAM con WLD | `/mini-apps/payments` |
-| 🎁 Grants | Auto-apply grants World Chain | `/mini-apps/grants-latin` |
-| 🏆 Viral Rewards | Referidos + Leaderboard LATAM | `/mini-apps/viral-rewards` |
-
-## Setup Rápido
+## Commands
 
 ```bash
-git clone https://github.com/luisfelipevegarodriguez/worldid-max-stack-2026
-npm install
-cp .env.example .env   # Rellenar con credenciales reales
-npm run dev
+pnpm install
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm build
 ```
 
-## Variables de Entorno
+`pnpm dev` starts `apps/web`. The build generates the Prisma client with a local dummy `DATABASE_URL` when none is set, and it does not connect to a database. Empty env vars are enough.
 
-Ver [`.env.example`](.env.example) — Credenciales en [developer.world.org](https://developer.world.org)
+Docker, from the repo root:
+
+```bash
+docker build -f services/backend/Dockerfile services/backend
+docker build -f services/growth-agent/Dockerfile services/growth-agent
+```
+
+## Layout
+
+| Path | Role |
+| --- | --- |
+| `apps/web` | Next.js app. Vercel project root. |
+| `packages/shared` | `triggerCriticalAction()` for agents. |
+| `services/backend` | `GET /healthz`, `POST /internal/self-heal`. |
+| `services/growth-agent` | `GET /healthz`. Does not call a model. |
+| `supabase/migrations/001_nullifiers.sql` | Free-tier database bootstrap. |
+
+Pinned versions live in `apps/web/package.json`.
 
 ## Deploy
 
-```bash
-npm run build
-npx vercel --prod
-```
+Free path: [docs/BOOTSTRAP.md](docs/BOOTSTRAP.md). [Issue #1](https://github.com/luisfelipevegarodriguez/worldid-max-stack-2026/issues/1) stays open until someone completes that checklist with real credentials and pastes the resulting URLs. `infra/zero-touch.sh` does not activate production.
 
-O push a `main` → GitHub Actions despliega automáticamente.
+## Environment
 
-## Grants LATAM
-
-Ver [`docs/GRANTS_STRATEGY.md`](docs/GRANTS_STRATEGY.md) para estrategia completa.
-
----
-
-**Links:**
-- [developer.world.org](https://developer.world.org)
-- [World Chain Grants](https://world.org/grants)
-- [Mini Apps Docs](https://docs.world.org/mini-apps)
+See [.env.example](.env.example). Missing server secrets degrade to JSON 503s. They are not required to build.

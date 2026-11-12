@@ -1,17 +1,17 @@
-import type { NextConfig } from 'next'
+import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
-  experimental: { serverActions: { allowedOrigins: ['*'] } },
-  headers: async () => [
-    {
-      source: '/api/:path*',
-      headers: [
-        { key: 'Access-Control-Allow-Origin', value: process.env.ALLOWED_ORIGIN ?? '*' },
-        { key: 'Access-Control-Allow-Methods', value: 'GET,POST,OPTIONS' },
-        { key: 'Access-Control-Allow-Headers', value: 'Content-Type,Authorization' },
-      ],
-    },
-  ],
-}
+  reactStrictMode: true,
+  transpilePackages: ['@worldid/shared'],
+  serverExternalPackages: ['@prisma/client', '@prisma/engines'],
+  // Lint is a separate `pnpm lint` step so a warning cannot fail the production build.
+  eslint: { ignoreDuringBuilds: true },
+  images: {
+    remotePatterns: [
+      { protocol: 'https', hostname: 'worldcoin.org' },
+      { protocol: 'https', hostname: 'world.org' },
+    ],
+  },
+};
 
-export default nextConfig
+export default nextConfig;
