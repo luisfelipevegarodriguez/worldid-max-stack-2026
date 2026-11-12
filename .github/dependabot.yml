@@ -1,0 +1,32 @@
+# Dependabot trata pnpm como ecosistema npm y lee pnpm-lock.yaml de la raíz.
+# Un solo directorio "/" cubre el workspace (apps/*, packages/*, services/*).
+# minor y patch van agrupados; cada major queda en su propio PR.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      npm-minor-and-patch:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      actions-minor-and-patch:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch

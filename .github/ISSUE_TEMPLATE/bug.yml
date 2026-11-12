@@ -1,0 +1,47 @@
+name: Bug
+description: Algo falla en la app, en un comando o en el camino gratuito de deploy.
+title: "bug: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe el fallo. No pegues secretos, tokens, `.env` ni claves
+        (`WORLD_SIGNING_KEY`, `JWT_SECRET`, `SUPABASE_SERVICE_ROLE_KEY`, `DATABASE_URL`).
+  - type: textarea
+    id: que-paso
+    attributes:
+      label: Qué pasó
+      description: Qué esperabas y qué ocurrió.
+    validations:
+      required: true
+  - type: textarea
+    id: pasos
+    attributes:
+      label: Pasos para reproducirlo
+      placeholder: |
+        1.
+        2.
+    validations:
+      required: true
+  - type: input
+    id: comandos
+    attributes:
+      label: Comandos
+      description: Por ejemplo `pnpm test` o `pnpm build`, desde la raíz.
+      placeholder: pnpm test
+  - type: textarea
+    id: logs
+    attributes:
+      label: Salida
+      description: Solo el fragmento útil, con secretos tachados.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Comprobaciones
+      options:
+        - label: No incluí secretos, claves ni contenido de `.env`.
+          required: true
+        - label: Lo reproduje en local (Actions no corre por la facturación).
+          required: false
