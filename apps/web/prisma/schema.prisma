@@ -1,0 +1,78 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// Maps onto supabase/migrations/001_nullifiers.sql. That SQL file is the free-tier bootstrap.
+model Nullifier {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  nullifierHash String   @unique @map("nullifier_hash")
+  action        String
+  metadata      Json     @default("{}")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([action])
+  @@index([createdAt])
+  @@map("nullifiers")
+}
+
+model User {
+  id             String   @id @default(cuid())
+  worldNullifier String   @unique
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  flags          Json     @default("{\"blocked\": false, \"grant_eligible\": true, \"agent_delegated\": false}")
+
+  proofs      WorldProof[]
+  loginLogs   WorldLoginLog[]
+  githubLinks GitHubLink[]
+  delegations AgentDelegation[]
+}
+
+model WorldProof {
+  id         String   @id @default(cuid())
+  userId     String
+  proof      Json
+  action     String
+  verifiedAt DateTime @default(now())
+  level      String
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+model WorldLoginLog {
+  id        String   @id @default(cuid())
+  userId    String
+  ipHash    String?
+  userAgent String?
+  loggedAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+model GitHubLink {
+  id             String   @id @default(cuid())
+  userId         String
+  githubUsername String
+  encryptedToken String
+  linkedAt       DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+model AgentDelegation {
+  id          String    @id @default(cuid())
+  userId      String
+  agentId     String
+  agentType   String
+  permissions Json
+  active      Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  expiresAt   DateTime?
+
+  user User @relation(fields: [userId], references: [id])
+}

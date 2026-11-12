@@ -1,49 +1,36 @@
-'use client'
+import Link from 'next/link';
+import WorldIDGate from '@/components/WorldIDGate';
 
-import { IDKitWidget, VerificationLevel, type ISuccessResult } from '@worldcoin/idkit'
-import { useState } from 'react'
+const apps = [
+  { href: '/mini-apps/payments', title: 'Payments', desc: 'Remesas instantáneas LATAM' },
+  { href: '/mini-apps/grants', title: 'Grants', desc: 'Aplica a grants World Chain' },
+  { href: '/mini-apps/rewards', title: 'Rewards', desc: 'Referidos virales por país' },
+];
 
 export default function HomePage() {
-  const [status, setStatus] = useState<'idle' | 'verifying' | 'verified' | 'error'>('idle')
-  const [jwt, setJwt] = useState<string | null>(null)
-
-  const handleVerify = async (proof: ISuccessResult) => {
-    setStatus('verifying')
-    const res = await fetch('/api/auth/worldid/verify', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(proof),
-    })
-    if (!res.ok) { setStatus('error'); return }
-    const { token } = await res.json()
-    setJwt(token)
-    setStatus('verified')
-  }
-
   return (
-    <main style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: 40 }}>
-      <h1>Human-Verified Agent Platform</h1>
-      <p>Verify you are human. Delegate to AI agents securely.</p>
-
-      {status === 'idle' && (
-        <IDKitWidget
-          app_id={process.env.NEXT_PUBLIC_WORLD_APP_ID as `app_${string}`}
-          action="human-verified-agent-2026"
-          verification_level={VerificationLevel.Orb}
-          handleVerify={handleVerify}
-          autoClose
-        >
-          {({ open }) => (
-            <button onClick={open} style={{ padding: '12px 24px', fontSize: 16, borderRadius: 8, cursor: 'pointer' }}>
-              🌍 Verify with World ID
-            </button>
-          )}
-        </IDKitWidget>
-      )}
-
-      {status === 'verifying' && <p>⏳ Verifying proof on-chain...</p>}
-      {status === 'verified' && <p>✅ Human verified! JWT issued. Ready to delegate to agents.</p>}
-      {status === 'error' && <p>❌ Verification failed. Try again.</p>}
+    <main className="mx-auto flex min-h-screen max-w-3xl flex-col items-center gap-8 p-8">
+      <div className="text-center">
+        <h1 className="mb-2 text-4xl font-bold">World ID Max Stack</h1>
+        <p className="text-gray-500">Verificación humana — mini apps LATAM y agentes con delegación.</p>
+      </div>
+      <WorldIDGate action="login" mode="session" />
+      <div className="grid w-full grid-cols-1 gap-4 md:grid-cols-3">
+        {apps.map((app) => (
+          <Link
+            key={app.href}
+            href={app.href}
+            className="rounded-2xl border p-6 text-center transition-all hover:shadow-lg"
+          >
+            <h2 className="text-xl font-semibold">{app.title}</h2>
+            <p className="mt-1 text-sm text-gray-500">{app.desc}</p>
+          </Link>
+        ))}
+      </div>
+      <p className="max-w-xl text-center text-sm text-gray-500">
+        Los agentes llaman a <code>POST /api/agent/trigger</code> con el JWT de sesión. Sin
+        orquestador configurado esa ruta responde 503 y no finge el reenvío.
+      </p>
     </main>
-  )
+  );
 }

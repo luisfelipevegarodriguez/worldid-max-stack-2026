@@ -1,48 +1,39 @@
-name: 🚀 Deploy World ID Max Stack
+name: Deploy World ID Max Stack
 
 on:
   push:
     branches: [main]
-  pull_request:
-    branches: [main]
 
+# Blocked by Actions billing, same as ci.yml. Production deploy is the Vercel
+# project in docs/BOOTSTRAP.md, not this workflow.
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
         with:
-          node-version: '20'
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Type check
-        run: npm run type-check
-
-      - name: Lint
-        run: npm run lint
-
-      - name: Build
-        run: npm run build
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm test
+      - run: pnpm build
         env:
-          NEXT_PUBLIC_WORLD_APP_ID: ${{ secrets.NEXT_PUBLIC_WORLD_APP_ID }}
-          WORLD_RP_ID: ${{ secrets.WORLD_RP_ID }}
+          NEXT_PUBLIC_WORLD_APP_ID: app_staging_build_placeholder
           NEXT_PUBLIC_WORLD_ENVIRONMENT: production
-          ALLOW_LEGACY_PROOFS: false
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          NEXT_PUBLIC_APP_URL: http://localhost:3000
 
-      - name: Deploy to Vercel (Production)
+      - name: Deploy apps/web to Vercel
         if: github.ref == 'refs/heads/main'
         uses: amondnet/vercel-action@v25
         with:
           vercel-token: ${{ secrets.VERCEL_TOKEN }}
           vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
           vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          working-directory: apps/web
           vercel-args: '--prod'

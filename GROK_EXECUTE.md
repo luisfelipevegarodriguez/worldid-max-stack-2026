@@ -1,79 +1,12 @@
-# INSTRUCCIÓN DE EJECUCIÓN AUTÓNOMA — WORLD MAX STACK
+# Do not run the old zero-touch flow
 
-> Pega este archivo completo en Grok con el mensaje: "Ejecuta esto en mi entorno"
-> Grok puede ayudarte a ejecutar paso a paso con su CLI si tienes Grok con acceso a terminal.
+`bash infra/zero-touch.sh` exits 2. It does not deploy, and it must not be used to close GitHub issue #1.
 
-## CONTEXTO
-Repo: https://github.com/luisfelipevegarodriguez/worldid-max-stack-2026  
-Objetivo: Desplegar World ID 4.0 full-stack en producción, zero-touch desde este punto.
+The free bootstrap is [docs/BOOTSTRAP.md](docs/BOOTSTRAP.md):
 
-## PASO 1 — Cargar secrets (hazlo tú, 2 min)
+1. Create a World ID app and keep the signing key off git.
+2. Create a Supabase free project and run `supabase/migrations/001_nullifiers.sql`.
+3. Import the repo in Vercel Hobby with root directory `apps/web`, framework Next.js, and build command `pnpm run build`.
+4. Optionally `docker build` `services/backend` and `services/growth-agent` and run them on Cloud Run (min instances 0) or Fly.
 
-URL directa: https://github.com/luisfelipevegarodriguez/worldid-max-stack-2026/settings/secrets/actions
-
-Secrets requeridos:
-```
-DATABASE_URL
-BACKEND_JWT_SECRET
-WORLD_ID_APP_SECRET
-WORLD_CHAIN_RPC_URL
-VERCEL_TOKEN
-GH_TOKEN
-GCP_SA_KEY
-GCP_PROJECT
-OPENAI_API_KEY
-CRON_SECRET
-DEPLOYER_PK
-TREASURY
-NEXT_PUBLIC_WORLD_ID_APP_ID
-NEXT_PUBLIC_APP_URL
-PAYMENT_ROUTER_ADDR
-```
-
-## PASO 2 — Ejecución única (copia y pega en terminal)
-
-```bash
-git clone https://github.com/luisfelipevegarodriguez/worldid-max-stack-2026.git
-cd worldid-max-stack-2026
-bash infra/zero-touch.sh
-```
-
-## LO QUE HACE zero-touch.sh AUTOMÁTICAMENTE
-
-1. Instala deps faltantes (gh, vercel, forge, jq)
-2. Autentica GCP, GitHub, Vercel con los secrets
-3. Carga todos los secrets en los 3 stores (GitHub Actions, Vercel, GCP Secret Manager)
-4. Despliega PaymentRouter en World Chain (CREATE2 idempotente)
-5. Push a main → dispara canary.yml
-6. Espera CI verde (gh run watch)
-7. Health checks con retry (backend/healthz, growth-agent/healthz, frontend/api/analytics/full)
-8. Registra Cloud Scheduler self-heal cada 5 min
-9. Imprime bloque WORLD MAX STACK — ACTIVO
-
-## LO QUE HACE canary.yml AUTOMÁTICAMENTE (sin intervención)
-
-1. Tests
-2. Build Docker → GCR
-3. Deploy canary 10% Cloud Run
-4. SLO gate: 5min bake + error <1% + p95 <800ms
-5. Promote 100% o auto-rollback
-6. Deploy Vercel frontend
-
-## ÚNICO PASO MANUAL IRREDUCTIBLE
-
-https://developer.world.org/apps → Submit app → Review por TFH
-
-## OUTPUT ESPERADO AL FINALIZAR
-
-```
-==================================================
- WORLD MAX STACK — ACTIVO
- PaymentRouter : 0x...
- Backend URL   : https://world-backend-....run.app
- Growth Agent  : https://growth-agent-....run.app
- Frontend URL  : https://....vercel.app
- Siguiente paso: https://developer.world.org/apps
-==================================================
-```
-
-Pega ese bloque en https://github.com/luisfelipevegarodriguez/worldid-max-stack-2026/issues/1
+GitHub Actions cannot start while the account billing block is in place. Verify with `pnpm install`, `pnpm lint`, `pnpm typecheck`, `pnpm test`, and `pnpm build` on a machine, not in Actions.
