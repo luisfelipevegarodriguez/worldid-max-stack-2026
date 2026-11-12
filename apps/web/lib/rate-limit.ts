@@ -1,18 +1,41 @@
 import { configured } from './config';
 
-const WINDOW_MS = 10 * 60 * 1000;
+export const WINDOW_MS = 10 * 60 * 1000;
 const MAX_HITS = 5;
+/** Bound for the in-memory fallback. Live keys past this are evicted least-recently-used. */
+export const MAX_MEMORY_KEYS = 1024;
 const hits = new Map<string, number[]>();
 
+function sweepExpired(now: number): void {
+  for (const [key, stamps] of hits) {
+    if (!stamps.some((stamp) => now - stamp < WINDOW_MS)) hits.delete(key);
+  }
+}
+
+function remember(key: string, stamps: number[]): void {
+  const existing = hits.has(key);
+  if (existing) hits.delete(key);
+  if (!existing && hits.size >= MAX_MEMORY_KEYS) {
+    const oldest = hits.keys().next().value;
+    if (oldest !== undefined) hits.delete(oldest);
+  }
+  hits.set(key, stamps);
+}
+
 export function memoryAllow(key: string, now = Date.now()): boolean {
+  sweepExpired(now);
   const recent = (hits.get(key) ?? []).filter((stamp) => now - stamp < WINDOW_MS);
   if (recent.length >= MAX_HITS) {
-    hits.set(key, recent);
+    remember(key, recent);
     return false;
   }
   recent.push(now);
-  hits.set(key, recent);
+  remember(key, recent);
   return true;
+}
+
+export function memoryKeyCount(): number {
+  return hits.size;
 }
 
 export function resetMemoryLimits(): void {

@@ -51,11 +51,18 @@ export default function WorldIDButton({ action = 'login', mode = 'nullifier', on
   async function begin() {
     setError(null);
     setStatus('loading');
-    const res = await fetch('/api/rp-signature', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ action }),
-    });
+    let res: Response;
+    try {
+      res = await fetch('/api/rp-signature', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action }),
+      });
+    } catch {
+      setStatus('error');
+      setError('network_error');
+      return;
+    }
     const data = (await res.json().catch(() => ({}))) as SignaturePayload;
     if (
       !res.ok ||
@@ -85,11 +92,18 @@ export default function WorldIDButton({ action = 'login', mode = 'nullifier', on
     setStatus('loading');
     setError(null);
     const endpoint = mode === 'session' ? '/api/auth/worldid/verify' : '/api/verify';
-    const res = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(mode === 'session' ? result : { idkitResponse: result }),
-    });
+    let res: Response;
+    try {
+      res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(mode === 'session' ? result : { idkitResponse: result }),
+      });
+    } catch {
+      setStatus('error');
+      setError('network_error');
+      throw new Error('network_error');
+    }
     const data = (await res.json().catch(() => ({}))) as {
       error?: string;
       nullifier?: string;

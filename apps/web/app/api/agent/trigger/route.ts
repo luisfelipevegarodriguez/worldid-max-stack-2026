@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 
 const bodySchema = z.object({
   action_type: z.enum(['zoom_and_sign', 'agent_delegation', 'github_dispatch', 'miniapp_action']),
-  metadata: z.record(z.unknown()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
 export async function POST(req: NextRequest) {
