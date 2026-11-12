@@ -37,3 +37,13 @@ No call site in this repo changed. `new PrismaClient()` and `import { PrismaClie
 - `new PrismaClient()` requires a driver adapter. This app uses `@prisma/adapter-pg` and the `pg` package: `new PrismaClient({ adapter: new PrismaPg({ connectionString }) })`. The client is constructed only when `DATABASE_URL` is set.
 - Minimum TypeScript for the Prisma 7 CLI is 5.4. This repo already uses 5.4+.
 - Prisma 8 is still a release candidate (`8.0.0-rc.33` on the `latest` dist-tag). This repo stays on the stable 7.10.1 client.
+
+## Next.js 15.3.9 → 16.4.6
+
+- `middleware.ts` is renamed to `proxy.ts` and the exported function is `proxy`. Proxy runs on the Node.js runtime. The Edge runtime is not used.
+- `next lint` is removed. `pnpm lint` runs `eslint .` with the flat config in `apps/web/eslint.config.mjs` (`eslint-config-next` 16.4.6, ESLint 9). `next build` no longer lints.
+- The `eslint` key in `next.config.ts` is removed.
+- `tsconfig.json` `jsx` is `react-jsx`. Next also adds `.next/dev/types/**/*.ts` to `include`.
+- Turbopack is the default production bundler. This app has no custom webpack config.
+- Synchronous `params`, `searchParams`, `cookies()`, and `headers()` are removed. This app does not use them.
+- React stays on 19. Node stays on 22.
