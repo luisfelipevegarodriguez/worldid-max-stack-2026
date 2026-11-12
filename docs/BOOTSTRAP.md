@@ -14,7 +14,7 @@ Issue #1 stays open until a person finishes the steps below and comments with th
 3. Add the action ids this app requests: `login`, `mini-app-payment`, `apply-grant-latam`, `claim-viral-reward`, `human-verified-agent-2026`.
 4. Add the verify redirect you actually use. The app posts proofs to its own `/api/verify` and `/api/auth/worldid/verify` routes.
 
-The signing key is server-only (`WORLD_SIGNING_KEY`). IDKit 2.x cannot sign RP requests; `/api/rp-signature` returns 501 until the IDKit 4 upgrade. Proof verification against `POST https://developer.world.org/api/v4/verify/{rp_id}` still runs when `WORLD_RP_ID` is set.
+The signing key is server-only (`WORLD_SIGNING_KEY`). `POST /api/rp-signature` calls `signRequest({ signingKeyHex, action })` and returns the nonce, timestamps, and signature the widget needs as `rp_context`. If the key or `WORLD_RP_ID` is empty, that route returns 503 `signing_unconfigured` and the widget stays closed. Proof verification posts the IDKit result unchanged to `POST https://developer.world.org/api/v4/verify/{rp_id}`.
 
 ## 2. Supabase (free)
 
@@ -50,7 +50,7 @@ Environment variables (Production and Preview). Empty values are valid; the rout
 | `NEXT_PUBLIC_WORLD_ENVIRONMENT` | no | `production` when you go live |
 | `NEXT_PUBLIC_APP_URL` | no | the deployed `https://….vercel.app` origin |
 | `WORLD_RP_ID` | no | yes |
-| `WORLD_SIGNING_KEY` | no | only after IDKit 4, for `/api/rp-signature` |
+| `WORLD_SIGNING_KEY` | no | yes, for `/api/rp-signature` and the widget |
 | `JWT_SECRET` | no | yes, for session JWT and `/api/agent/trigger` |
 | `DATABASE_URL` or `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` | no | one of the two, to persist nullifiers |
 | `ALLOW_LEGACY_PROOFS` | no | `false` unless you still accept legacy proofs |

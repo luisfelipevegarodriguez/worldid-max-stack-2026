@@ -8,9 +8,25 @@ export function proofFromBody(body: unknown): ProofPayload | null {
   return record;
 }
 
-export function nullifierOf(proof: ProofPayload): string | undefined {
-  const value = proof.nullifier_hash;
+function stringValue(value: unknown): string | undefined {
   return typeof value === 'string' && value.length > 0 ? value : undefined;
+}
+
+export function nullifierOf(proof: ProofPayload): string | undefined {
+  const direct = stringValue(proof.nullifier_hash) ?? stringValue(proof.nullifier);
+  if (direct) return direct;
+  if (!Array.isArray(proof.responses)) return undefined;
+  for (const item of proof.responses) {
+    if (!item || typeof item !== 'object') continue;
+    const record = item as Record<string, unknown>;
+    const nullifier = stringValue(record.nullifier);
+    if (nullifier) return nullifier;
+    if (Array.isArray(record.session_nullifier)) {
+      const sessionNullifier = stringValue(record.session_nullifier[0]);
+      if (sessionNullifier) return sessionNullifier;
+    }
+  }
+  return undefined;
 }
 
 export function actionOf(proof: ProofPayload, fallback = 'unknown'): string {
@@ -23,6 +39,6 @@ export function readVerified(payload: unknown): { verified: boolean; nullifier?:
   if (!payload || typeof payload !== 'object') return { verified: false };
   const body = payload as Record<string, unknown>;
   const verified = body.verified === true || body.success === true;
-  const nullifier = typeof body.nullifier_hash === 'string' ? body.nullifier_hash : undefined;
+  const nullifier = stringValue(body.nullifier_hash) ?? stringValue(body.nullifier);
   return { verified, nullifier };
 }

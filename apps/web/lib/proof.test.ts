@@ -17,7 +17,17 @@ test('readVerified accepts v2 success and v4 verified', () => {
     verified: true,
     nullifier: '0x1',
   });
-  assert.deepEqual(readVerified({ verified: true }), { verified: true, nullifier: undefined });
+  assert.deepEqual(readVerified({ verified: true, nullifier: '123' }), { verified: true, nullifier: '123' });
   assert.deepEqual(readVerified({ verified: false }), { verified: false, nullifier: undefined });
   assert.deepEqual(readVerified(null), { verified: false });
+});
+
+test('nullifierOf reads IDKit 4 response items', () => {
+  const proof = proofFromBody({
+    protocol_version: '4.0',
+    action: 'login',
+    responses: [{ nullifier: '999' }],
+  });
+  assert.equal(nullifierOf(proof!), '999');
+  assert.equal(actionOf(proof!), 'login');
 });

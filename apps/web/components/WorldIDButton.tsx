@@ -1,6 +1,11 @@
 'use client';
 
-import { IDKitWidget, VerificationLevel, type ISuccessResult } from '@worldcoin/idkit';
+import {
+  IDKitRequestWidget,
+  proofOfHuman,
+  type IDKitResult,
+  type RpContext,
+} from '@worldcoin/idkit';
 import { useState } from 'react';
 import { isPlaceholder } from '@/lib/config';
 
@@ -10,8 +15,27 @@ interface Props {
   onSuccess?: (nullifier: string) => void;
 }
 
+type SignaturePayload = {
+  rp_id?: string;
+  nonce?: string;
+  created_at?: number;
+  expires_at?: number;
+  sig?: string;
+  allow_legacy_proofs?: boolean;
+  error?: string;
+};
+
+function environmentOf(): 'production' | 'staging' | 'sandbox' {
+  const value = process.env.NEXT_PUBLIC_WORLD_ENVIRONMENT;
+  if (value === 'staging' || value === 'sandbox') return value;
+  return 'production';
+}
+
 export default function WorldIDButton({ action = 'login', mode = 'nullifier', onSuccess }: Props) {
   const appId = process.env.NEXT_PUBLIC_WORLD_APP_ID;
+  const [open, setOpen] = useState(false);
+  const [rp, setRp] = useState<RpContext | null>(null);
+  const [allowLegacy, setAllowLegacy] = useState(false);
   const [status, setStatus] = useState<'idle' | 'loading' | 'verified' | 'error'>('idle');
   const [error, setError] = useState<string | null>(null);
 
@@ -24,49 +48,90 @@ export default function WorldIDButton({ action = 'login', mode = 'nullifier', on
     );
   }
 
-  const handleVerify = async (proof: ISuccessResult) => {
+  async function begin() {
+    setError(null);
+    setStatus('loading');
+    const res = await fetch('/api/rp-signature', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ action }),
+    });
+    const data = (await res.json().catch(() => ({}))) as SignaturePayload;
+    if (
+      !res.ok ||
+      !data.rp_id ||
+      !data.nonce ||
+      !data.sig ||
+      typeof data.created_at !== 'number' ||
+      typeof data.expires_at !== 'number'
+    ) {
+      setStatus('error');
+      setError(data.error || 'signing_unconfigured');
+      return;
+    }
+    setAllowLegacy(data.allow_legacy_proofs === true);
+    setRp({
+      rp_id: data.rp_id,
+      nonce: data.nonce,
+      created_at: data.created_at,
+      expires_at: data.expires_at,
+      signature: data.sig,
+    });
+    setStatus('idle');
+    setOpen(true);
+  }
+
+  async function handleVerify(result: IDKitResult) {
     setStatus('loading');
     setError(null);
     const endpoint = mode === 'session' ? '/api/auth/worldid/verify' : '/api/verify';
     const res = await fetch(endpoint, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(mode === 'session' ? proof : { idkitResponse: proof }),
+      body: JSON.stringify(mode === 'session' ? result : { idkitResponse: result }),
     });
-    const data = (await res.json().catch(() => ({}))) as { error?: string; nullifier?: string; nullifier_hash?: string };
+    const data = (await res.json().catch(() => ({}))) as {
+      error?: string;
+      nullifier?: string;
+      nullifier_hash?: string;
+    };
     if (!res.ok) {
-      const message = data.error || 'Verification failed';
+      const message = data.error || 'verification_failed';
       setStatus('error');
       setError(message);
       throw new Error(message);
     }
-    const nullifier = data.nullifier || data.nullifier_hash || '';
-    onSuccess?.(nullifier);
-  };
+    onSuccess?.(data.nullifier || data.nullifier_hash || '');
+  }
 
   return (
     <div className="flex flex-col items-center gap-3">
-      <IDKitWidget
-        app_id={appId as `app_${string}`}
-        action={action}
-        verification_level={VerificationLevel.Orb}
-        handleVerify={handleVerify}
-        onSuccess={() => setStatus('verified')}
+      <button
+        type="button"
+        onClick={begin}
+        disabled={status === 'loading' || status === 'verified'}
+        className="rounded-xl bg-black px-6 py-3 font-semibold text-white transition-all hover:bg-gray-800 disabled:opacity-50"
       >
-        {({ open }) => (
-          <button
-            type="button"
-            onClick={open}
-            disabled={status === 'loading' || status === 'verified'}
-            className="rounded-xl bg-black px-6 py-3 font-semibold text-white transition-all hover:bg-gray-800 disabled:opacity-50"
-          >
-            {status === 'loading' && 'Verificando...'}
-            {status === 'verified' && 'Verificado con World ID'}
-            {status === 'idle' && 'Verificar con World ID'}
-            {status === 'error' && 'Reintentar'}
-          </button>
-        )}
-      </IDKitWidget>
+        {status === 'loading' && 'Verificando...'}
+        {status === 'verified' && 'Verificado con World ID'}
+        {status === 'idle' && 'Verificar con World ID'}
+        {status === 'error' && 'Reintentar'}
+      </button>
+      {rp && (
+        <IDKitRequestWidget
+          open={open}
+          onOpenChange={setOpen}
+          app_id={appId as `app_${string}`}
+          action={action}
+          rp_context={rp}
+          allow_legacy_proofs={allowLegacy}
+          preset={proofOfHuman()}
+          environment={environmentOf()}
+          handleVerify={handleVerify}
+          onSuccess={() => setStatus('verified')}
+          onError={() => setStatus('error')}
+        />
+      )}
       {status === 'verified' && mode === 'session' && (
         <p className="text-sm text-green-700">Sesión humana emitida. Lista para delegar a un agente.</p>
       )}
