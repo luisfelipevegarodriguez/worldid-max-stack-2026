@@ -1,0 +1,48 @@
+name: Tarea
+description: Un cambio acotado de código, docs o configuración. Sin servicios de pago.
+title: "tarea: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Una tarea, un resultado. El camino por defecto es Vercel Hobby, una región,
+        sin servicios de pago y con los pagos sin liquidar (`settled: false`).
+  - type: textarea
+    id: objetivo
+    attributes:
+      label: Objetivo
+      description: Qué tiene que quedar hecho cuando la tarea se cierre.
+    validations:
+      required: true
+  - type: textarea
+    id: alcance
+    attributes:
+      label: Alcance
+      description: Archivos o rutas que entran, y lo que queda fuera.
+    validations:
+      required: true
+  - type: textarea
+    id: verificacion
+    attributes:
+      label: Cómo se verifica
+      description: Comandos de la raíz. Lo habitual es `pnpm lint`, `pnpm typecheck`, `pnpm test` y `pnpm build`.
+      placeholder: |
+        pnpm lint
+        pnpm typecheck
+        pnpm test
+        pnpm build
+    validations:
+      required: true
+  - type: checkboxes
+    id: reglas
+    attributes:
+      label: Reglas
+      options:
+        - label: Cabe en un PR pequeño.
+          required: true
+        - label: No pide un servicio de pago, otra región ni liquidar pagos.
+          required: true
+        - label: No pide commitear secretos.
+          required: true

@@ -8,6 +8,10 @@ on:
 
 # This account's Actions minutes are blocked by billing, so this workflow
 # does not currently start. The same commands are what to run locally.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
